@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 Created on Sun May 24 11:14:48 2020
 
@@ -11,7 +11,7 @@ import seaborn as sns
 import matplotlib.dates as mdates
 import datetime
 
-def line_plot_df_tindex(y,data,title,ylabel,ycolor):
+def line_plot_df_tindex(y,data,title,ylabel,ycolor,num_rolling_days=7):
     #Set Style
     sns.set_style('darkgrid', 
               {
@@ -37,8 +37,9 @@ def line_plot_df_tindex(y,data,title,ylabel,ycolor):
 
     #Line Plot with mean
     v_mean = data[y].mean()
-    
-    ax = sns.lineplot(x=data.index,y=v_mean
+    v_df_moving_averages = data[y].rolling(window=num_rolling_days).mean()
+ 
+    ax = sns.lineplot(x=data.index,y=v_df_moving_averages
                       ,color = '#5CFE00'
                       ,alpha = 0.2        
                       ,dashes=True
@@ -46,9 +47,12 @@ def line_plot_df_tindex(y,data,title,ylabel,ycolor):
                      )
     
     #Line Plots with Standard Deviation
+    v_df_moving_upper_stds = v_df_moving_averages + 2*data[y].rolling(window=num_rolling_days).std()
+    v_df_moving_lower_stds = v_df_moving_averages - 2*data[y].rolling(window=num_rolling_days).std()
+    
     v_std =  data[y].std()
 
-    ax = sns.lineplot(x=data.index,y=v_mean + v_std
+    ax = sns.lineplot(x=data.index,y=v_df_moving_upper_stds
                       ,color = '#5CFE00'
                       ,alpha = 0.2        
                       ,dashes=True
@@ -57,7 +61,7 @@ def line_plot_df_tindex(y,data,title,ylabel,ycolor):
     
     ax.lines[1].set_linestyle('dotted')
     
-    ax = sns.lineplot(x=data.index,y=v_mean - v_std
+    ax = sns.lineplot(x=data.index,y=v_df_moving_lower_stds
                       ,color = '#5CFE00'
                       ,alpha = 0.2        
                       ,dashes=True
@@ -108,22 +112,23 @@ def line_plot_df_tindex(y,data,title,ylabel,ycolor):
                 ,xy=(x_max,y_max)
                 ,xytext=(x_max,y_max+lbl_y_max_offset)
                 ,ha='center')
-
-    ax.annotate('  MIN: {0:.0f} \n {1}'.format(y_min,x_min.strftime(str_date_format))
+    
+    if (x_min != x_max) :
+        ax.annotate('  MIN: {0:.0f} \n {1}'.format(y_min,x_min.strftime(str_date_format))
                 ,xy=(x_min,y_min)
                 ,xytext=(x_min,y_min+lbl_y_min_offset)
                 ,ha='center')
 
-    ax.annotate('  {0:.0f} \n {1}'.format(y_latest,x_latest.strftime(str_date_format))
+    if (x_latest != x_max) and (x_latest!= x_min) :
+        ax.annotate('  {0:.0f} \n {1}'.format(y_latest,x_latest.strftime(str_date_format))
                 ,xy=(x_latest,y_latest)
                 ,xytext=(x_latest,y_latest+lbl_y_offset)
                 ,ha='center')
     
-    ax.annotate('AVG: {0:.1f} STD: {1:.1f}'.format(v_mean,v_std)
-                ,xy=(x_mean,y_mean)
-                ,xytext=(x_mean,y_mean+lbl_y_offset)
-                ,ha='left',color='#5CFE00')
-
+    plt.figtext(0.1, 0.05,'x̄: {0:.1f} σ: {1:.1f} : Rolling[x̄ +- 2σ] N={2:.0f}'.format(v_mean,v_std,num_rolling_days)
+               #,ha='right'
+               ,color='#5CFE00') 
+    
     #Axis and Labels formating
     ax.set_title(title)
     
