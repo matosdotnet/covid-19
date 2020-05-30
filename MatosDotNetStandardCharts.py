@@ -11,9 +11,33 @@ import seaborn as sns
 import matplotlib.dates as mdates
 import datetime
 
-def line_plot_df_tindex(y,data,title,ylabel,ycolor,num_rolling_days=7):
+def line_plot_df_tindex(y,data,title,ylabel,ycolor,window_span=7,bollinger_type='EMA',evends_data = pd.DataFrame()):
+    '''
+    bollinger_type:
+                    'EMA' Exponential moving average
+                    'MA' Moving average
+    '''
+    #Mean ans Standard Deviations
+    v_mean = data[y].mean()
+    v_std =  data[y].std()
+
+    v_df_averages    = pd.Series([], dtype= 'float64')
+    v_df_upper_stds  = pd.Series([], dtype= 'float64')
+    v_df_lower_stds  = pd.Series([], dtype= 'float64')
+
+    if bollinger_type == 'MA':
+        v_df_averages = data[y].rolling(window=window_span).mean()
+        v_df_upper_stds = v_df_averages + 2*data[y].rolling(window=window_span).std()
+        v_df_lower_stds = v_df_averages - 2*data[y].rolling(window=window_span).std()
+    elif bollinger_type == 'EMA':
+        v_df_averages = data[y].ewm(span=window_span).mean()
+        v_df_upper_stds = v_df_averages + 2*data[y].ewm(span=window_span).std()
+        v_df_lower_stds = v_df_averages - 2*data[y].ewm(span=window_span).std()
+    else :
+        return 0
+
     #Set Style
-    sns.set_style('darkgrid', 
+    sns.set_style('darkgrid',
               {
                   'axes.facecolor': '#646666',
                   'figure.facecolor': '#646666',
@@ -29,46 +53,40 @@ def line_plot_df_tindex(y,data,title,ylabel,ycolor,num_rolling_days=7):
                   'axes.spines.top': False,
                   'axes.spines.right': False,
                   'text.color': 'white'
-                  
+
               })
 
     #Set Fig Size
     fig = plt.figure(figsize=(12,5))
 
-    #Line Plot with mean
-    v_mean = data[y].mean()
-    v_df_moving_averages = data[y].rolling(window=num_rolling_days).mean()
- 
-    ax = sns.lineplot(x=data.index,y=v_df_moving_averages
-                      ,color = '#5CFE00'
-                      ,alpha = 0.2        
-                      ,dashes=True
-                     # ,estimator = 'mean'
-                     )
-    
-    #Line Plots with Standard Deviation
-    v_df_moving_upper_stds = v_df_moving_averages + 2*data[y].rolling(window=num_rolling_days).std()
-    v_df_moving_lower_stds = v_df_moving_averages - 2*data[y].rolling(window=num_rolling_days).std()
-    
-    v_std =  data[y].std()
+    #Plot events
+    for d in evends_data.index :
+        plt.axvline(d,color='#000000',linestyle='dotted',alpha=0.2)
 
-    ax = sns.lineplot(x=data.index,y=v_df_moving_upper_stds
+    #Line Plots for Mean and Standard Deviation
+    ax = sns.lineplot(x=data.index,y=v_df_averages
                       ,color = '#5CFE00'
-                      ,alpha = 0.2        
+                      ,alpha = 0.2
                       ,dashes=True
                      # ,estimator = 'mean'
                      )
-    
-    ax.lines[1].set_linestyle('dotted')
-    
-    ax = sns.lineplot(x=data.index,y=v_df_moving_lower_stds
+
+    ax = sns.lineplot(x=data.index,y=v_df_upper_stds
                       ,color = '#5CFE00'
-                      ,alpha = 0.2        
+                      ,alpha = 0.2
+                      ,dashes=True
+                     # ,estimator = 'mean'
+                     )
+
+    ax.lines[1].set_linestyle('dotted')
+    ax = sns.lineplot(x=data.index,y=v_df_lower_stds
+                      ,color = '#5CFE00'
+                      ,alpha = 0.2
                       ,dashes=True
                      # ,estimator = 'mean'
                      )
     ax.lines[2].set_linestyle('dotted')
-    
+
     #Line Plot with data
 
     ax = sns.lineplot(x=data.index,y=data[y]
@@ -94,7 +112,7 @@ def line_plot_df_tindex(y,data,title,ylabel,ycolor,num_rolling_days=7):
 
     # Slice the chart canvas
     ax.set_xlim(data.index.min(), data.index.max()+datetime.timedelta(days=1))
-      
+
     if y_min >= 0 :
         ax.set_ylim(0, y_max+y_max*0.10)
     else :
@@ -112,7 +130,7 @@ def line_plot_df_tindex(y,data,title,ylabel,ycolor,num_rolling_days=7):
                 ,xy=(x_max,y_max)
                 ,xytext=(x_max,y_max+lbl_y_max_offset)
                 ,ha='center')
-    
+
     if (x_min != x_max) :
         ax.annotate('  MIN: {0:.0f} \n {1}'.format(y_min,x_min.strftime(str_date_format))
                 ,xy=(x_min,y_min)
@@ -124,14 +142,14 @@ def line_plot_df_tindex(y,data,title,ylabel,ycolor,num_rolling_days=7):
                 ,xy=(x_latest,y_latest)
                 ,xytext=(x_latest,y_latest+lbl_y_offset)
                 ,ha='center')
-    
-    plt.figtext(0.1, 0.05,'x̄: {0:.1f} σ: {1:.1f} : Rolling[x̄ +- 2σ] N={2:.0f}'.format(v_mean,v_std,num_rolling_days)
+
+    plt.figtext(0.1, 0.05,'x̄: {0:.1f} σ: {1:.1f} : {2}[x̄ +- 2σ] N={3:.0f}'.format(v_mean,v_std,bollinger_type,window_span)
                #,ha='right'
-               ,color='#5CFE00') 
-    
+               ,color='#5CFE00')
+
     #Axis and Labels formating
     ax.set_title(title)
-    
+
     #Make sure the dataset has continuous dates in the DataFrame
     ax.set_xlabel('Last {0} days'.format(len(data.index)))
     ax.set_ylabel(ylabel)
@@ -142,8 +160,8 @@ def line_plot_df_tindex(y,data,title,ylabel,ycolor,num_rolling_days=7):
 
     # Fill Area
     plt.fill_between( data.index, data[y], color=ycolor, alpha=0.2)
-    
+
     #fig.savefig("{}.png".format(title),bbox_inches = 'tight', dpi=plt.gcf().dpi,facecolor='#646666')
-    fig.savefig("{}.png".format(title),bbox_inches = 'tight', dpi=300,facecolor='#646666')
-    
+    fig.savefig("img/{}.png".format(title),bbox_inches = 'tight', dpi=300,facecolor='#646666')
+
     plt.show()
